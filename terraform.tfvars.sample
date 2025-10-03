@@ -1,0 +1,8 @@
+controller_fqdn=myController.mydomain.com
+admin_username=admin
+admin_password=adminPassword
+aws_account=myAWSAccountName
+azure_account=myAzureSubscriptionAccountName
+dns_zone_name=myDomain.com
+dns_prefix=myChatBot
+ssh_key_name=myAwsSshKeyName

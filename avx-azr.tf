@@ -2,6 +2,22 @@ data "dns_a_record_set" "controller_ip" {
   host = var.controller_fqdn
 }
 
+data "azurerm_dns_zone" "dns_zone" {
+  count = var.dns_zone_name == "dummy" ? 0 : 1
+
+  name = var.dns_zone_name
+}
+
+resource "azurerm_dns_a_record" "name" {
+  count = var.dns_zone_name == "dummy" ? 0 : 1
+
+  name                = "chat"
+  zone_name           = var.dns_zone_name
+  resource_group_name = data.azurerm_dns_zone.dns_zone[0].resource_group_name
+  ttl                 = 10
+  records             = [module.ec2_instance_linux.private_ip]
+}
+
 module "azure_transit_oai" {
   source = "terraform-aviatrix-modules/mc-transit/aviatrix"
 

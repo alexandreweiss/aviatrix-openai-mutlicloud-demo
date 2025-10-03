@@ -27,13 +27,6 @@ The deployment provisions:
 
 ## Components
 
-### Infrastructure
-
-- **AWS VPC**: `10.52.0.0/24` CIDR with multiple subnets
-- **Aviatrix Transit Gateway**: `10.58.0.0/23` CIDR for inter-cloud connectivity
-- **Aviatrix Spoke Gateway**: Connects application VPC to transit network
-- **EC2 Instance**: `t3.medium` Ubuntu 24.04 LTS server
-
 ### Application Stack
 
 The EC2 instance is automatically configured with:
@@ -42,7 +35,7 @@ The EC2 instance is automatically configured with:
 - **Python Environment**: Python 3 with venv and pip for application dependencies
 - **Node.js**: NPM for frontend dependencies
 - **Rust/Cargo**: For building embedding tools
-- **SSL Certificate**: Self-signed certificate for HTTPS (`chat.aviatrix.local`)
+- **SSL Certificate**: Self-signed certificate for HTTPS. Check the domain name to use in the ouput.
 
 ### Azure AI Search Integration
 
@@ -52,47 +45,51 @@ Pre-configured JSON schemas for:
 - **Indexer**: Content extraction and metadata processing
 - **Semantic Search**: Enhanced search with BM25 similarity and HNSW algorithm
 
-### Subnets
+### VPC, VNET and Gateways10.52
 
-- **Public Subnets**: Aviatrix gateway and HA gateway subnets
-- **Private Subnets**: Application servers (`front-a`, `front-b`)
-- **Route Tables**: Separate routing for public internet and internal traffic
+- **One vnet on Azure**: hosts all the AI elements and the storage account used as the source of data for RAG and an Aviatrix Spoke gateway connecting AI services privately to rest of the network,
+- **One VPC on AWS**: hosts the AWS EC2 instance running the Python Chat GPT demo application and an Aviatrix Spoke gateway connecting back to Azure and AI services privately
+- **A transit per CSP region**: provides the hub in that multi-cloud/region hub and spoke architecture
 
 ## Security
-
-### Security Groups
-
-1. **RFC1918 Internal**: Allows all traffic from private IP ranges (10.0.0.0/8, 192.168.0.0/16, 172.16.0.0/12)
-2. **Public Web/SSH**: 
-   - HTTPS (443) and HTTP (80-83) from anywhere
-   - SSH (22) restricted to your public IP
 
 ### DNS Security
 
 - Custom DNS configuration bypasses public DNS
-- Points to private Azure DNS resolver for secure name resolution
+- Points to private Azure DNS resolver for secure name resolution across clouds.
 - Enables private cross-cloud connectivity for DNS requests and Open AI access.
 
 ## Required Variables
 
 ```hcl
-variable "aws_r1_location" {
-  description = "AWS region for deployment"
-  type        = string
-}
 
-variable "aws_r1_location_short" {
-  description = "Short name for AWS region"
-  type        = string
-}
+controller_fqdn : contains the FQDN or IP of your Aviatrix Controller for Terraform to access it.
+admin_username : Aviatrix Controller admin username (default is admin).
+admin_password : Password of the admin user above.
+aws_account : the name of the Cloud Account corresponding to your AWS account you want to deploy the Application EC2 VM to.
+azure_account : the name of the Cloud Account corresponding to your Azure Subscription you want to deploy AI resources to.
+dns_zone_name : if you want to publish you chatbot under your own Azure DNS zone, type here the domain name of it. (default to aviatrix.local)
+dns_prefix : Used to concatenate with dns zone name and gives you the full chat bot FQDN (default to chat.aviatrix.local)
+ssh_key_name : you can provide the name of the AWS Key pair already existing in your account. Otherwise, if not provided, it will create on and output it on this module folder. BE CAREFUL to store this private key securely.
 
-variable "aws_account" {
-  description = "Aviatrix AWS account name"
-  type        = string
-}
+```
+## Deployment
+
+If you use Terraform cloud, you can keep the below section in the versions.tf file updating with your own organization name and workspace name.
+
+```hcl
+  cloud {
+    organization = "ananableu"
+    workspaces {
+      name = "aviatrix-oai-01"
+    }
+  }
 ```
 
-## Deployment
+Otherwise, comment it out.
+
+> [!WARNING]
+> The account your are using to deploy this code must be able to assign or delete roles on the AI services (owner is an example but can also be "Role Based Access Control Administrator")
 
 1. **Clone Repository**:
    ```bash
@@ -123,49 +120,69 @@ variable "aws_account" {
 
 ## Post-Deployment
 
+### Demo Laptop configuration
+
+As Azure Open AI, Azure AI Search and the Storage Account are only privatly exposed, you need to connect to them privately for configuration.
+You can use the VPN Gateway deployed as part of this architecture by downloading the Client Certificate file of a user attached to it.
+You will also need to add entries to your hosts file with the ouputs. Examples are :
+
+```
+a_open_ai_endpoint_name_hosts_file_entry = "10.147.70.102 aviatrix-ignite-cea-147.openai.azure.com"
+b_ai_search_name_hosts_file_entry = "10.147.70.101 aviatrix-ignite-search-147.search.windows.net"
+c_storage_account_hosts_file_entry = "10.147.70.100 eusavxignitesa76522.blob.core.windows.net"
+```
+
+Finally, if you want to search for DNS and TLS flows from the AWS application to the DNS and Open AI in Azure, you can filter in FlowIQ using
+
+```
+d_aws_instance_private_ip = "10.52.0.11" as a source ip address,
+e_private_dns_resolver_inbound_endpoint_ip = "10.147.70.116" as a destination IP to find DNS related traffic (UDP/53)
+f_private_endpoint_open_ai_ip = "10.147.70.102" as a destination IP to find HTTPS requests to Open AI (TCP/443) 
+```
+
 ### Access the Application
 
-1. **Connect to EC2 Instance**:
+1. **Update Index and Indexer configuration**  
+   Update the index and indexers with the sample JSON at the end of this readme.
+
+2. **Connect to EC2 Instance**:
+   Using your own ssh key, login to the EC2 instance with user ubuntu
    ```bash
    ssh -i your-key.pem ubuntu@<instance-private-ip>
    ```
 
-2. **Navigate to Application**:
+3. **Navigate to Application**:
    ```bash
    cd ~/sample-app-aoai-chatGPT
    ```
 
-3. **Configure OpenAI Settings**:
-   - Edit configuration files with your Azure OpenAI endpoint
-   - Set up API keys and search service credentials
-
 4. **Start Application**:
+   Start the application. It will install all the pre-requisites and start a listener on port 50505 using HTTPS.
    ```bash
-   # Follow Microsoft's setup instructions in the cloned repository
-   python -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
+   ./start.sh
    ```
 
 ### DNS Configuration
 
-The instance is configured to use private DNS resolver at `10.147.70.116` for:
-- Azure service name resolution
-- Cross-cloud connectivity
-- Private endpoint access
+The AWS EC2 instance is configured to use private DNS resolver inbound endpoint which is a private IP of the Azure VNET. It provides the below:
+- Azure service name resolution,
+- Cross-cloud DNS resolution,
+- Private endpoint private IP resolution.
 
 ## Monitoring and Troubleshooting
 
-### Logs
+### Network Connectivity and visibility
 
-- **Cloud-init logs**: `/var/log/cloud-init-output.log`
-- **Application logs**: Check the sample app documentation
+To demonstrate private connectivity between AWS and Azure:
 
-### Network Connectivity
+- Open Aviatrix Copilot and go to the Monitoring/FlowIQ view.
+- Search for traffic with source as the AWS EC2 instance (from the ouput) and port 53, protocol UDP
+- Search for traffic with source as the AWS EC2 instance (from the ouput) and port 443, protocol TCP
 
-- Verify Aviatrix gateway status in controller
-- Check security group rules
-- Test DNS resolution: `nslookup <azure-service>.azure.com`
+These two searches will show 
+- the AWS EC2 instance resolving DNS name to IP for the Azure Open AI private endpoint
+- the AWS EC2 instance connecting of TCP 443 to the AZure Open AI private endpoint
+- Traffic between AZure Open AI and Azure AI Search is done inside the Microsoft backbone using managed identities.
 
 ## Cleanup
 
@@ -187,10 +204,133 @@ terraform destroy
 - [Microsoft OpenAI Sample App](https://github.com/microsoft/sample-app-aoai-chatGPT)
 - [Azure AI Search Documentation](https://docs.microsoft.com/en-us/azure/search/)
 
-## Support
+## Index and Indexer configuration sample
 
-For issues related to:
-- **Infrastructure**: Check Terraform and Aviatrix documentation
-- **Application**: Refer to Microsoft's sample app repository
-- **Networking**: Verify Aviatrix controller and gateway status
+This gives correct field for the Index and fields mapping.
+Once index and indexer are created by Terraform, you can edit and provide the below JSONs.
 
+## AI Search Index JSON
+{
+  "@odata.etag": "\"0x8DDFBA34DA85B85\"",
+  "name": "oai-data-index",
+  "fields": [
+    {
+      "name": "id",
+      "type": "Edm.String",
+      "searchable": false,
+      "filterable": false,
+      "retrievable": true,
+      "stored": true,
+      "sortable": false,
+      "facetable": false,
+      "key": true,
+      "synonymMaps": []
+    },
+    {
+      "name": "content",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": false,
+      "retrievable": true,
+      "stored": true,
+      "sortable": false,
+      "facetable": false,
+      "key": false,
+      "analyzer": "standard.lucene",
+      "synonymMaps": []
+    },
+    {
+      "name": "embedding",
+      "type": "Collection(Edm.Single)",
+      "searchable": true,
+      "filterable": false,
+      "retrievable": true,
+      "stored": true,
+      "sortable": false,
+      "facetable": false,
+      "key": false,
+      "dimensions": 1536,
+      "vectorSearchProfile": "vector-profile",
+      "synonymMaps": []
+    }
+  ],
+  "scoringProfiles": [],
+  "suggesters": [],
+  "analyzers": [],
+  "normalizers": [],
+  "tokenizers": [],
+  "tokenFilters": [],
+  "charFilters": [],
+  "similarity": {
+    "@odata.type": "#Microsoft.Azure.Search.BM25Similarity"
+  },
+  "semantic": {
+    "configurations": [
+      {
+        "name": "semantic-conf",
+        "flightingOptIn": false,
+        "rankingOrder": "BoostedRerankerScore",
+        "prioritizedFields": {
+          "prioritizedContentFields": [
+            {
+              "fieldName": "content"
+            }
+          ],
+          "prioritizedKeywordsFields": []
+        }
+      }
+    ]
+  },
+  "vectorSearch": {
+    "algorithms": [
+      {
+        "name": "defaultVectorAlgo",
+        "kind": "hnsw",
+        "hnswParameters": {
+          "metric": "cosine",
+          "m": 4,
+          "efConstruction": 400,
+          "efSearch": 500
+        }
+      }
+    ],
+    "profiles": [
+      {
+        "name": "vector-profile",
+        "algorithm": "defaultVectorAlgo"
+      }
+    ],
+    "vectorizers": [],
+    "compressions": []
+  }
+}
+
+
+# AI Search Indexer JSON
+{
+  "name": "aoi-indexer",
+  "description": null,
+  "dataSourceName": "oai-data-datasource",
+  "skillsetName": null,
+  "targetIndexName": "oai-data-index",
+  "disabled": null,
+  "schedule": null,
+  "parameters": {
+    "batchSize": null,
+    "maxFailedItems": null,
+    "maxFailedItemsPerBatch": null,
+    "configuration": {
+      "dataToExtract": "contentAndMetadata"
+    }
+  },
+  "fieldMappings": [
+    {
+      "sourceFieldName": "content",
+      "targetFieldName": "content",
+      "mappingFunction": null
+    }
+  ],
+  "outputFieldMappings": [],
+  "cache": null,
+  "encryptionKey": null
+}

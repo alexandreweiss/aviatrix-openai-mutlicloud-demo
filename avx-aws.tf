@@ -92,6 +92,31 @@ module "aws_r1_spoke_app1" {
   single_az_ha     = false
 }
 
+
+resource "tls_private_key" "ssh" {
+  count = var.ssh_key_name == "dummy" ? 1 : 0
+
+  algorithm = "ED25519"
+}
+
+
+resource "aws_key_pair" "ssh" {
+  count = var.ssh_key_name == "dummy" ? 1 : 0
+
+  key_name   = "aws-ec2-ssh-${random_integer.random.result}"
+  public_key = tls_private_key.ssh[0].public_key_openssh
+  tags       = { ManagedBy = "Terraform" }
+}
+
+resource "local_sensitive_file" "private_key" {
+  count = var.ssh_key_name == "dummy" ? 1 : 0
+
+  filename             = "${path.module}/aws-ec2-ssh-${random_integer.random.result}.pem"
+  content              = tls_private_key.ssh[0].private_key_openssh
+  file_permission      = "0600"
+  directory_permission = "0700"
+}
+
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"]
@@ -108,16 +133,20 @@ module "ec2_instance_linux" {
 
   ami                         = data.aws_ami.ubuntu.image_id
   instance_type               = "t3.medium"
-  key_name                    = "ssh-linux-non-prod"
+  key_name                    = var.ssh_key_name == "dummy" ? aws_key_pair.ssh[0].key_name : var.ssh_key_name
   monitoring                  = true
   subnet_id                   = aws_subnet.this["front-a"].id
   vpc_security_group_ids      = [aws_security_group.allow_all_rfc1918.id]
   associate_public_ip_address = false
-  user_data                   = base64encode(local.cloud_init_config)
+  user_data_base64            = base64encode(local.cloud_init_config)
 
   tags = {
     Cloud       = "AWS"
     Application = "Dev Server"
+    csp-environment : "tst",
+    csp-department : "dept-530",
+    shutdown : "stop",
+    schedule : "08:00-11:00;mo,tu,we,th,fr;europe-paris"
   }
 }
 

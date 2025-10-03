@@ -38,17 +38,23 @@ variable "aws_account" {
   description = "CSP account onboarder on the controller"
 }
 
-# variable "ssh_public_key" {
-#   sensitive   = true
-#   description = "Linux SSH public key"
-# }
+variable "dns_zone_name" {
+  description = "DNS Zone Name to publish chat bot A record"
+  default     = "dummy"
+}
 
-# data "dns_a_record_set" "controller_ip" {
-#   host = var.controller_fqdn
-# }
+variable "dns_prefix" {
+  description = "DNS Prefix for the chat bot"
+  default     = "chat"
+}
 
 variable "controller_fqdn" {
   description = "FQDN or IP of the Aviatrix Controller"
+}
+
+variable "ssh_key_name" {
+  description = "SSH Key Name"
+  default     = "dummy"
 }
 
 variable "admin_password" {
@@ -83,7 +89,7 @@ locals {
   }
   cloud_init_config = templatefile("${path.module}/script.sh.tpl", {
     dns_server_ip                = azurerm_private_dns_resolver_inbound_endpoint.dns-inbound.ip_configurations[0].private_ip_address
-    certificate_cn               = var.certificate_cn
+    certificate_cn               = var.dns_zone_name == "dummy" ? "chat.aviatrix.local" : "${var.dns_prefix}.${var.dns_zone_name}"
     azure_openai_deployment_name = azurerm_cognitive_deployment.aviatrix.name
     azure_openai_model           = azurerm_cognitive_deployment.aviatrix.model[0].name
     azure_openai_key             = azurerm_cognitive_account.aviatrix-ignite.primary_access_key

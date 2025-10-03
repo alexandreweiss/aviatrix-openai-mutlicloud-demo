@@ -110,7 +110,7 @@ resource "azurerm_cognitive_deployment" "aviatrix" {
   }
   sku {
     name     = "GlobalStandard"
-    capacity = 10
+    capacity = 100
   }
   version_upgrade_option = "OnceCurrentVersionExpired"
 }

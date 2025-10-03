@@ -3,7 +3,22 @@ terraform {
     aviatrix = {
       source = "aviatrixsystems/aviatrix"
     }
+    tls = {
+      source = "hashicorp/tls"
+    }
+    azurerm = {
+      source = "hashicorp/azurerm"
+    }
+    aws = {
+      source = "hashicorp/aws"
+    }
+    local = {
+      source = "hashicorp/local"
+    }
+
   }
+
+
   cloud {
     organization = "ananableu"
     workspaces {
