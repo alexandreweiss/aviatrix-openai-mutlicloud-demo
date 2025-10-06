@@ -3,6 +3,9 @@
 This Terraform deployment creates a multi-cloud infrastructure demo showcasing OpenAI integration with Azure AI Search using Aviatrix networking.
 
 ## Architecture Overview
+![Architecture Diagram](image/architecture-diagram.png)
+
+## Packet walk
 ![Packet Walk Diagram](image/oai-packet-walk.png)
 
 **Packet Walk Explanation:**
@@ -10,12 +13,12 @@ This Terraform deployment creates a multi-cloud infrastructure demo showcasing O
 1. **User Request:** The user accesses the OpenAI chat application hosted on the EC2 instance in the AWS Spoke VPC.
 2. **Application Processing:** The application processes the request and prepares to query Azure Open AI and in turn, Azure AI Search.
 3. **DNS Resolution:** The EC2 instance uses the custom DNS resolver to resolve Azure service endpoints privately.
-4. **Aviatrix Transit:** The request traverses the Aviatrix Spoke Gateway to the Transit Gateway, enabling secure cross-cloud routing.
-5. **Azure AI Search Query:** The request exits AWS via the Aviatrix Azure Transit Gateway over IPSec tunnel and reaches Azure AI Search over private connectivity.
-6. **Response Path:** Azure AI Search and Open AI returns results via the same secure path, back to the EC2 instance.
+4. **Aviatrix Transit:** The request traverses the Aviatrix data plane enabling secure cross-cloud routing across spoke and transit gateways.
+5. **Azure AI Search Query:** Azure Open AI processes query using its own managed identity against Azure AI Search
+6. **Response Path:** Azure AI Search via Open AI, returns results over the same secure path, back to the EC2 instance.
 7. **User Response:** The application sends the processed response to the user.
 
-This packet walk demonstrates secure, private, and automated cross-cloud connectivity between AWS and Azure using Aviatrix networking for private endpoint access and private DNS resolution.
+This packet walk demonstrates cross-cloud connectivity between AWS and Azure using Aviatrix Cloud Native Security Fabric (#cnsf) for private endpoint access, private DNS resolution and in transit encryption.
 
 The deployment provisions:
 
