@@ -18,6 +18,21 @@ output "d_aws_instance_private_ip" {
   description = "The private IP address of the AWS EC2 instance."
 }
 
+output "d_aws_instance_dmz_private_ip" {
+  value       = module.ec2_instance_linux_dmz.private_ip
+  description = "The private IP address of the AWS EC2 dmz instance."
+}
+
+output "d_aws_instance_chat_url" {
+  value       = "https://${local.chat_certificate_cn}"
+  description = "The chat URL of the AWS EC2 instance."
+}
+
+output "d_aws_instance_app_url" {
+  value       = "https://${local.app_certificate_cn}"
+  description = "The app URL of the AWS EC2 instance."
+}
+
 output "e_private_dns_resolver_inbound_endpoint_ip" {
   value       = azurerm_private_dns_resolver_inbound_endpoint.dns-inbound.ip_configurations[0].private_ip_address
   description = "The private IP address of the DNS resolver inbound endpoint."

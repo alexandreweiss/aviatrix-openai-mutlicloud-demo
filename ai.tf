@@ -1,6 +1,6 @@
 # Create a resource group in Azure region R1 named "rg-oai-lab"
 resource "azurerm_resource_group" "r1-rg" {
-  name     = "rg-oai-${var.azure_r1_location_short}-lab"
+  name     = "oai-${var.azure_r1_location_short}-lab-rg"
   location = var.azure_r1_location
 }
 
@@ -31,20 +31,6 @@ resource "azurerm_subnet" "r1-azure-spoke-oai-vm-subnet" {
   name                 = "vm-subnet"
   resource_group_name  = azurerm_resource_group.r1-rg.name
   virtual_network_name = azurerm_virtual_network.azure-spoke-oai-r1.name
-}
-
-resource "azurerm_subnet" "r1-azure-spoke-aoi-webapp-subnet" {
-  address_prefixes     = ["10.147.70.64/27"]
-  name                 = "webapp-subnet"
-  resource_group_name  = azurerm_resource_group.r1-rg.name
-  virtual_network_name = azurerm_virtual_network.azure-spoke-oai-r1.name
-  delegation {
-    name = "delegation"
-    service_delegation {
-      name    = "Microsoft.Web/serverFarms"
-      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
-    }
-  }
 }
 
 resource "azurerm_subnet" "r1-azure-spoke-aoi-pe-subnet" {
@@ -84,14 +70,28 @@ resource "azurerm_subnet" "r1-azure-spoke-aoi-dns-outbound-subnet" {
   }
 }
 
+resource "azurerm_subnet" "r1-azure-spoke-oai-aci-subnet" {
+  address_prefixes     = ["10.147.70.144/28"]
+  name                 = "aci-subnet"
+  resource_group_name  = azurerm_resource_group.r1-rg.name
+  virtual_network_name = azurerm_virtual_network.azure-spoke-oai-r1.name
+  delegation {
+    name = "delegation"
+    service_delegation {
+      name    = "Microsoft.ContainerInstance/containerGroups"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+    }
+  }
+}
+
 # Create an OpenAI Service named "aviatrix-ignite" in Azure Region R1
 resource "azurerm_cognitive_account" "aviatrix-ignite" {
-  name                          = "aviatrix-ignite-147"
+  name                          = "aviatrix-ignite-${random_integer.random.result}"
   location                      = var.azure_oai_location
   resource_group_name           = azurerm_resource_group.r1-rg.name
   kind                          = "OpenAI"
   sku_name                      = "S0"
-  custom_subdomain_name         = "aviatrix-ignite-${var.azure_oai_location_short}-147"
+  custom_subdomain_name         = "aviatrix-ignite-${var.azure_oai_location_short}-${random_integer.random.result}"
   public_network_access_enabled = false
   identity {
     type = "SystemAssigned"
@@ -160,7 +160,7 @@ resource "azurerm_private_dns_a_record" "oai-srv-dns" {
 # Create OpenAI search service named "aviatrix-ignite-search" in Azure Region R1 with system assigned identity enabled
 resource "azurerm_search_service" "aviatrix-ignite-search" {
   location                   = var.azure_r1_location
-  name                       = "aviatrix-ignite-search-147"
+  name                       = "aviatrix-ignite-search-${random_integer.random.result}"
   resource_group_name        = azurerm_resource_group.r1-rg.name
   network_rule_bypass_option = "AzureServices"
   sku                        = "basic"

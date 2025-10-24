@@ -10,6 +10,14 @@ variable "vpc_cidr" {
   default = "10.52.0.0/24"
 }
 
+variable "ssh_public_key" {
+  description = "SSH public key content"
+  type        = string
+  default     = ""
+}
+
+
+
 resource "aws_vpc" "this" {
   cidr_block = var.vpc_cidr
 
@@ -20,7 +28,7 @@ resource "aws_vpc" "this" {
 
 #Create route tables
 resource "aws_route_table" "this" {
-  for_each = toset(["avx-gw", "avx-hagw", "rt-internal-a", "rt-internal-b"])
+  for_each = toset(["avx-gw", "avx-hagw", "rt-internal-a", "rt-internal-b", "dmz"])
   vpc_id   = aws_vpc.this.id
 
   tags = {
@@ -63,6 +71,7 @@ resource "aws_subnet" "this" {
   tags = {
     Name = each.key
   }
+  depends_on = [aws_vpc.this]
 }
 
 #Associate all subnets with designated route tables
@@ -108,6 +117,14 @@ resource "aws_key_pair" "ssh" {
   tags       = { ManagedBy = "Terraform" }
 }
 
+resource "aws_key_pair" "provided_ssh" {
+  count = var.ssh_key_name != "dummy" && var.ssh_public_key != "" ? 1 : 0
+
+  key_name   = var.ssh_key_name
+  public_key = var.ssh_public_key
+  tags       = { ManagedBy = "Terraform" }
+}
+
 resource "local_sensitive_file" "private_key" {
   count = var.ssh_key_name == "dummy" ? 1 : 0
 
@@ -142,7 +159,32 @@ module "ec2_instance_linux" {
 
   tags = {
     Cloud       = "AWS"
-    Application = "Dev Server"
+    Application = "ChatGPT-Bot-Server"
+    csp-environment : "tst",
+    csp-department : "dept-530",
+    shutdown : "stop",
+    schedule : "08:00-11:00;mo,tu,we,th,fr;europe-paris"
+  }
+}
+
+module "ec2_instance_linux_dmz" {
+  source = "terraform-aws-modules/ec2-instance/aws"
+
+  name = "aws-${var.aws_r1_location_short}-oai-jump"
+
+  ami                         = data.aws_ami.ubuntu.image_id
+  instance_type               = "t3.medium"
+  key_name                    = var.ssh_key_name == "dummy" ? aws_key_pair.ssh[0].key_name : var.ssh_key_name
+  monitoring                  = true
+  subnet_id                   = aws_subnet.this["dmz"].id
+  vpc_security_group_ids      = [aws_security_group.allow_all_rfc1918.id, aws_security_group.allow_web_ssh_public.id]
+  associate_public_ip_address = false
+  user_data_base64            = base64encode(local.cloud_init_config_dmz)
+  create_eip                  = true
+
+  tags = {
+    Cloud       = "AWS"
+    Application = "Jumpbox"
     csp-environment : "tst",
     csp-department : "dept-530",
     shutdown : "stop",

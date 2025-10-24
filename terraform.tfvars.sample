@@ -1,8 +1,37 @@
-controller_fqdn=myController.mydomain.com
-admin_username=admin
-admin_password=adminPassword
-aws_account=myAWSAccountName
-azure_account=myAzureSubscriptionAccountName
-dns_zone_name=myDomain.com
-dns_prefix=myChatBot
-ssh_key_name=myAwsSshKeyName
+# Azure Region 1 Configuration
+azure_r1_location = "East US"
+azure_r1_location_short = "eus"
+
+# AWS Region 1 Configuration
+aws_r1_location = "eu-central-1"
+aws_r1_location_short = "fra"
+
+# Azure OpenAI Configuration
+azure_oai_location = "Canada East"
+azure_oai_location_short = "cea"
+
+# Account Configuration
+azure_account = "your-azure-account-name"
+aws_account = "your-aws-account-name"
+
+# DNS Configuration
+dns_zone_name = "dummy"
+dns_prefix = "chat"
+dns_server_ip = "10.147.70.116"
+certificate_cn = "chat.aviatrix.local"
+
+# Controller Configuration
+controller_fqdn = "your-controller-fqdn.com"
+
+# SSH Configuration
+ssh_key_name = "dummy"
+ssh_public_key = ""
+
+# Admin Configuration
+admin_username = "admin"
+admin_password = "your-secure-password"
+
+# Application Configuration
+application_1 = "myapp1"
+customer_name = "contoso"
+customer_website = "www.aviatrix.com"

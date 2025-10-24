@@ -36,6 +36,7 @@ provider "azurerm" {
 }
 
 provider "aws" {
+  region = var.aws_r1_location
 }
 
 provider "aviatrix" {

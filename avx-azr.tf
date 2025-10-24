@@ -8,14 +8,24 @@ data "azurerm_dns_zone" "dns_zone" {
   name = var.dns_zone_name
 }
 
-resource "azurerm_dns_a_record" "name" {
+resource "azurerm_dns_a_record" "chat_name" {
   count = var.dns_zone_name == "dummy" ? 0 : 1
 
-  name                = "chat"
+  name                = var.chat_dns_prefix
   zone_name           = var.dns_zone_name
   resource_group_name = data.azurerm_dns_zone.dns_zone[0].resource_group_name
   ttl                 = 10
-  records             = [module.ec2_instance_linux.private_ip]
+  records             = [module.ec2_instance_linux_dmz.public_ip]
+}
+
+resource "azurerm_dns_a_record" "app_name" {
+  count = var.dns_zone_name == "dummy" ? 0 : 1
+
+  name                = var.app_dns_prefix
+  zone_name           = var.dns_zone_name
+  resource_group_name = data.azurerm_dns_zone.dns_zone[0].resource_group_name
+  ttl                 = 10
+  records             = [module.ec2_instance_linux_dmz.public_ip]
 }
 
 module "azure_transit_oai" {
@@ -29,7 +39,7 @@ module "azure_transit_oai" {
   local_as_number = 65012
   single_az_ha    = false
   ha_gw           = false
-  instance_size   = "Standard_B2s"
+  instance_size   = "Standard_D2s_v3"
   tags = {
     csp-environment : "tst",
     csp-department : "dept-530",
@@ -49,22 +59,24 @@ module "azr_r1_spoke_oai" {
   region           = var.azure_r1_location
   account          = var.azure_account
   transit_gw       = module.azure_transit_oai.transit_gateway.gw_name
-  instance_size    = "Standard_B1ms"
-  attached         = true
-  single_az_ha     = false
-  ha_gw            = false
-  resource_group   = azurerm_resource_group.r1-rg.name
+  # instance_size    = "Standard_B1ms"
+  instance_size  = "Standard_D2s_v3"
+  attached       = true
+  single_az_ha   = false
+  ha_gw          = false
+  resource_group = azurerm_resource_group.r1-rg.name
 }
 
 resource "aviatrix_gateway" "azr_r1_spoke_vpn_oai" {
 
-  cloud_type       = 8
-  account_name     = var.azure_account
-  gw_name          = "azure-oai-vpn"
-  vpc_id           = "${azurerm_virtual_network.azure-spoke-oai-r1.name}:${azurerm_resource_group.r1-rg.name}:${azurerm_virtual_network.azure-spoke-oai-r1.guid}"
-  subnet           = azurerm_subnet.r1-azure-spoke-oai-gw-subnet.address_prefixes[0]
-  vpc_reg          = var.azure_r1_location
-  gw_size          = "Standard_B1ms"
+  cloud_type   = 8
+  account_name = var.azure_account
+  gw_name      = "azure-oai-vpn"
+  vpc_id       = "${azurerm_virtual_network.azure-spoke-oai-r1.name}:${azurerm_resource_group.r1-rg.name}:${azurerm_virtual_network.azure-spoke-oai-r1.guid}"
+  subnet       = azurerm_subnet.r1-azure-spoke-oai-gw-subnet.address_prefixes[0]
+  vpc_reg      = var.azure_r1_location
+  # gw_size          = "Standard_B1ms"
+  gw_size          = "Standard_D2s_v3"
   zone             = "az-1"
   vpn_access       = true
   vpn_cidr         = "172.20.21.0/24"

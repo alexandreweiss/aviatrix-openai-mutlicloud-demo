@@ -146,7 +146,8 @@ f_private_endpoint_open_ai_ip = "10.147.70.102" as a destination IP to find HTTP
 ### Access the Application
 
 1. **Update Index and Indexer configuration**  
-   Update the index and indexers with the sample JSON at the end of this readme.
+   Create the index, datasource and indexers with the sample JSON at the end of this readme.
+   THIS MUST BE DONE BEFORE STARTING THE APP AT STEP 5
 
 2. **Connect to EC2 Instance**:
    Using your own ssh key, login to the EC2 instance with user ubuntu
@@ -159,7 +160,12 @@ f_private_endpoint_open_ai_ip = "10.147.70.102" as a destination IP to find HTTP
    cd ~/sample-app-aoai-chatGPT
    ```
 
-4. **Start Application**:
+4. **Apply DNS config**
+   ```bash
+   sudo netplan apply
+   ```
+
+5. **Start Application**:
    Start the application. It will install all the pre-requisites and start a listener on port 50505 using HTTPS.
    ```bash
    ./start.sh
@@ -213,8 +219,8 @@ This gives correct field for the Index and fields mapping.
 Once index and indexer are created by Terraform, you can edit and provide the below JSONs.
 
 ## AI Search Index JSON
+```bash
 {
-  "@odata.etag": "\"0x8DDFBA34DA85B85\"",
   "name": "oai-data-index",
   "fields": [
     {
@@ -307,9 +313,41 @@ Once index and indexer are created by Terraform, you can edit and provide the be
     "compressions": []
   }
 }
+```
 
+# Storage Account data source (optional)
+If you create your datasource from that JSON instead of the Azure Portal UI, do not forget to update 
+
+- the name of the source storage account using the random number created for your deployment,
+- your subscription ID
+- your resource group name
+
+
+```bash
+{
+  "@odata.context": "https://aviatrix-ignite-search-147.search.windows.net/$metadata#datasources/$entity",
+  "name": "oai-data-datasource",
+  "description": null,
+  "type": "azureblob",
+  "subtype": null,
+  "indexerPermissionOptions": [],
+  "credentials": {
+    "connectionString": "ResourceId=/subscriptions/<your subscription id here>/resourceGroups/<your resource group name here>/providers/Microsoft.Storage/storageAccounts/eusavxignitesa<your random number here>;"
+  },
+  "container": {
+    "name": "oai-data",
+    "query": null
+  },
+  "dataChangeDetectionPolicy": null,
+  "dataDeletionDetectionPolicy": null,
+  "encryptionKey": null,
+  "identity": null
+}
+```
 
 # AI Search Indexer JSON
+
+```bash
 {
   "name": "aoi-indexer",
   "description": null,
@@ -337,3 +375,4 @@ Once index and indexer are created by Terraform, you can edit and provide the be
   "cache": null,
   "encryptionKey": null
 }
+```

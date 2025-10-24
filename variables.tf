@@ -10,12 +10,12 @@ variable "azure_r1_location_short" {
 
 variable "aws_r1_location" {
   description = "Region 1 location"
-  default     = "eu-central-1"
+  default     = "us-east-1"
 }
 
 variable "aws_r1_location_short" {
   description = "Short name of Region 1"
-  default     = "fra"
+  default     = "eus"
 }
 
 variable "azure_oai_location" {
@@ -43,9 +43,14 @@ variable "dns_zone_name" {
   default     = "dummy"
 }
 
-variable "dns_prefix" {
+variable "chat_dns_prefix" {
   description = "DNS Prefix for the chat bot"
   default     = "chat"
+}
+
+variable "app_dns_prefix" {
+  description = "DNS Prefix for the app"
+  default     = "app"
 }
 
 variable "controller_fqdn" {
@@ -68,6 +73,8 @@ variable "admin_username" {
 }
 
 locals {
+  chat_certificate_cn = var.dns_zone_name == "dummy" ? "chat.aviatrix.local" : "${var.chat_dns_prefix}.${var.dns_zone_name}"
+  app_certificate_cn  = var.dns_zone_name == "dummy" ? "app.aviatrix.local" : "${var.app_dns_prefix}.${var.dns_zone_name}"
   subnets = {
     avx-gw-subnet = {
       route_table = "avx-gw",
@@ -86,27 +93,55 @@ locals {
       cidr              = cidrsubnet(var.vpc_cidr, 4, 0)
       availability_zone = "${var.aws_r1_location}a"
     }
+    dmz = {
+      route_table       = "dmz",
+      cidr              = cidrsubnet(var.vpc_cidr, 4, 4)
+      availability_zone = "${var.aws_r1_location}a"
+    },
   }
   cloud_init_config = templatefile("${path.module}/script.sh.tpl", {
     dns_server_ip                = azurerm_private_dns_resolver_inbound_endpoint.dns-inbound.ip_configurations[0].private_ip_address
-    certificate_cn               = var.dns_zone_name == "dummy" ? "chat.aviatrix.local" : "${var.dns_prefix}.${var.dns_zone_name}"
+    chat_certificate_cn          = local.chat_certificate_cn
     azure_openai_deployment_name = azurerm_cognitive_deployment.aviatrix.name
     azure_openai_model           = azurerm_cognitive_deployment.aviatrix.model[0].name
     azure_openai_key             = azurerm_cognitive_account.aviatrix-ignite.primary_access_key
     azure_openai_endpoint        = azurerm_cognitive_account.aviatrix-ignite.endpoint
     azure_search_service         = azurerm_search_service.aviatrix-ignite-search.name
     azure_search_index           = "oai-data-index"
+    customer_name                = var.customer_name
   })
-}
-
-variable "dns_server_ip" {
-  description = "DNS server IP address"
-  type        = string
-  default     = "10.147.70.116"
+  cloud_init_config_dmz = templatefile("${path.module}/script-dmz.sh.tpl", {
+    dns_server_ip                = azurerm_private_dns_resolver_inbound_endpoint.dns-inbound.ip_configurations[0].private_ip_address
+    chat_certificate_cn          = local.chat_certificate_cn
+    app_certificate_cn           = local.app_certificate_cn
+    azure_openai_deployment_name = azurerm_cognitive_deployment.aviatrix.name
+    azure_openai_model           = azurerm_cognitive_deployment.aviatrix.model[0].name
+    azure_openai_key             = azurerm_cognitive_account.aviatrix-ignite.primary_access_key
+    azure_openai_endpoint        = azurerm_cognitive_account.aviatrix-ignite.endpoint
+    azure_search_service         = azurerm_search_service.aviatrix-ignite-search.name
+    azure_search_index           = "oai-data-index"
+    container_ip_address         = azurerm_container_group.app_container_group.ip_address
+    aws_oai_server_ip_address    = module.ec2_instance_linux.private_ip
+  })
 }
 
 variable "certificate_cn" {
   description = "Common Name for the SSL certificate"
   type        = string
-  default     = "chat.aviatrix.local"
+  default     = "dummy"
+}
+
+variable "application_1" {
+  description = "Application 1 name"
+  default     = "myapp1"
+}
+
+variable "customer_name" {
+  description = "Customer name"
+  default     = "contoso"
+}
+
+variable "customer_website" {
+  description = "Customer website like www.aviatrix.com"
+  default     = "www.aviatrix.com"
 }
